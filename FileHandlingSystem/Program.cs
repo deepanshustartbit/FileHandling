@@ -15,7 +15,7 @@ class Program
 
         string connectionString = config.GetConnectionString("DefaultConnection")!;
 
-        Console.WriteLine("Choose option:");
+        Console.WriteLine("Choose option: ");
         Console.WriteLine("1. Simple DFS Scan");
         Console.WriteLine("2. Producer-Consumer Scan");
         Console.WriteLine("3. Multi-threaded Scan (Parallel Workers)");
