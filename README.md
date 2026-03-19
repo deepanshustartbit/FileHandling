@@ -1,45 +1,47 @@
-# 🚀 File Handling System (High-Performance File Scanner)
+# 🚀 File Handling System (Enterprise File Scanner)
 
-## 📌 Why This Project?
+## 📌 Overview
 
-In real-world systems like antivirus software, backup tools, and data processing pipelines, there is a need to scan large volumes of files across deeply nested directories.
+This project is a high-performance file scanning system built using .NET, designed to efficiently process large volumes of files from multiple sources including:
 
-A basic approach (looping through folders) becomes:
+* Local file systems
+* Network-based storage (CIFS/NFS ready)
+* Cloud storage via Microsoft Graph API (OneDrive)
 
-* Slow ❌
-* Blocking ❌
-* Not scalable ❌
-
-👉 This project is built to demonstrate how to design a **high-performance and scalable file scanning system** using real-world backend concepts.
+The system demonstrates real-world backend design patterns used in enterprise applications such as antivirus engines, backup systems, and data processing pipelines.
 
 ---
 
 ## 🎯 Problem Statement
 
-* Scan all files in a directory (including nested folders)
-* Process files efficiently without blocking
-* Improve performance using parallel processing
-* Track execution and results using a database
+Traditional file scanning approaches:
+
+* Process files sequentially ❌
+* Re-scan unchanged files ❌
+* Cause performance bottlenecks ❌
+
+This system solves these issues by:
+
+* Using parallel processing
+* Avoiding redundant scans
+* Optimizing database operations
+* Supporting scalable architecture
 
 ---
 
-## ⚙️ System Flow
-
-User provides a directory path →
-System scans directories recursively →
-Files are added to a queue →
-Workers process files →
-Results are stored in database
+## ⚙️ System Architecture
 
 ```
-Input Path
-   ↓
-DFS Scanner
-   ↓
+Input Source (Local / Cloud)
+        ↓
+DFS Scanner / Graph API
+        ↓
 Queue (BlockingCollection)
-   ↓
+        ↓
 Workers (Parallel Processing)
-   ↓
+        ↓
+Processing Logic
+        ↓
 Database Logging
 ```
 
@@ -49,71 +51,53 @@ Database Logging
 
 ### ✅ 1. Recursive File Scanning (DFS)
 
-* Uses Depth First Search (DFS)
 * Traverses all nested directories
-* Ensures complete file discovery
-
-👉 Example:
-
-```
-Root → Folder → SubFolder → File
-```
+* Uses Depth First Search (DFS)
+* Memory-efficient using `yield return`
 
 ---
 
 ### ✅ 2. Producer–Consumer Pattern
 
-* Producer → Finds files
-* Queue → Stores files
-* Consumer → Processes files
-
-👉 Benefits:
-
-* Decouples scanning from processing
-* Improves performance
-* Enables scalability
+* Separates file discovery and processing
+* Uses `BlockingCollection`
+* Prevents bottlenecks
 
 ---
 
 ### ✅ 3. Multi-threaded Processing
 
-* Multiple workers process files simultaneously
-* Worker count based on system CPU:
+* Parallel file processing using multiple workers
+* Optimized with:
 
-```csharp
-Environment.ProcessorCount
-```
-
-👉 Benefits:
-
-* Faster execution
-* Better CPU utilization
+  ```csharp
+  Environment.ProcessorCount
+  ```
 
 ---
 
-### ✅ 4. Database Tracking
+### ✅ 4. Incremental Scan (Hash-Based)
 
-* Tracks scan jobs and processed files
-* Stores:
-
-  * Scan start time
-  * Scan completion time
-  * File paths processed
-  * Status
-
-👉 Useful for:
-
-* Monitoring
-* Debugging
-* Auditing
+* Uses SHA256 hashing
+* Skips unchanged files
+* Processes only modified/new files
 
 ---
 
-## 🏗️ Architecture
+### ✅ 5. Batch Optimized Database Inserts
 
-```
-DFS Scanner → Queue → Multi-threaded Workers → Database
-```
+* Reduces database calls
+* Inserts records in bulk
+* Improves performance significantly
+
+---
+
+### ✅ 6. Cloud File Scanning (Microsoft Graph API) 🔥
+
+* Fetches files from OneDrive
+* Uses delegated authentication
+* Supports personal Microsoft accounts
+* Integrates with existing processing pipeline
 
 ---
 
@@ -123,40 +107,49 @@ DFS Scanner → Queue → Multi-threaded Workers → Database
 * Producer–Consumer Pattern
 * Multi-threading (Task Parallelism)
 * Thread-safe operations (`Interlocked`)
-* Database operations using Dapper
+* File hashing (SHA256)
+* Batch processing
+* Microsoft Graph API
+* Delegated Authentication (OAuth2)
 
 ---
 
-## 🗄️ Database Structure
+## 🗄️ Database Design
 
 ### 📌 ScanJobs
 
-Stores overall scan execution details:
+Tracks scan execution:
 
-* Id
-* ScanType
-* StartTime
-* EndTime
-* Status
-* TotalFiles
+| Column     | Description          |
+| ---------- | -------------------- |
+| Id         | Job ID               |
+| ScanType   | Type of scan         |
+| StartTime  | Start time           |
+| EndTime    | Completion time      |
+| Status     | Running / Completed  |
+| TotalFiles | Processed file count |
 
 ---
 
 ### 📌 ScanFiles
 
-Stores processed file details:
+Tracks processed files:
 
-* Id
-* JobId
-* FilePath
-* Status
-* ProcessedTime
+| Column        | Description             |
+| ------------- | ----------------------- |
+| Id            | File ID                 |
+| JobId         | Reference to ScanJobs   |
+| FilePath      | File location           |
+| FileHash      | SHA256 hash             |
+| LastModified  | Last modified timestamp |
+| Status        | Processed               |
+| ProcessedTime | Timestamp               |
 
 ---
 
 ## ⚙️ Configuration
 
-Connection string is stored in:
+Stored in:
 
 ```
 appsettings.json
@@ -176,15 +169,15 @@ Example:
 
 ## 🚀 How to Run
 
-### 1️⃣ Restore packages
+### 1️⃣ Restore dependencies
 
-```bash
+```
 dotnet restore
 ```
 
-### 2️⃣ Run project
+### 2️⃣ Run application
 
-```bash
+```
 dotnet run
 ```
 
@@ -194,59 +187,95 @@ dotnet run
 1. Simple DFS Scan
 2. Producer-Consumer Scan
 3. Multi-threaded Scan
+4. Incremental Scan
+5. Batch Optimized Scan
+6. Graph API Scan (Cloud)
 ```
 
 ---
 
-## 🧪 Testing Example
+## 🔐 Graph API Setup (Personal Account)
 
-Create folder structure:
+* Use **Delegated Authentication**
+* Required permissions:
+
+  * `Files.Read`
+  * `User.Read`
+* Configure redirect URI:
+
+  ```
+  http://localhost
+  ```
+* Enable:
+
+  ```
+  Accounts in any directory + personal accounts
+  ```
+
+---
+
+## 🧪 Testing
+
+### Local Testing
 
 ```
 C:\ScannerTest
- ├── Folder1
- ├── Folder2
- │    └── SubFolder
- │         └── file.txt
+ ├── file1.txt
+ ├── file2.log
+ └── Folder
+      └── file3.txt
+```
+
+---
+
+### Graph Testing
+
+Upload files to:
+
+```
+https://onedrive.live.com
 ```
 
 ---
 
 ## ⚡ Performance Highlights
 
-* Bounded queue prevents memory overflow
-* Multi-threading improves speed
-* Separation of concerns improves scalability
+* Multi-threading improves throughput
+* Batch inserts reduce DB load
+* Incremental scanning avoids redundant processing
+* Scalable architecture for large datasets
 
 ---
 
 ## 🧠 Real-World Use Cases
 
-This system design is used in:
+This system can be used in:
 
-* Antivirus engines
-* Backup & restore systems
-* File indexing systems
-* Data pipelines
+* Antivirus and malware scanning
+* Backup and recovery systems
+* Data classification engines
+* Cloud storage analysis tools
+* Compliance and security auditing
 
 ---
 
 ## 🚀 Future Enhancements
 
-* File hashing (SHA256)
-* Incremental scanning (skip unchanged files)
-* File type filtering
-* Cloud scanning (SharePoint / OneDrive)
+* Graph API pagination & throttling handling
+* Distributed scanning (multi-node architecture)
+* Regex-based content scanning (sensitive data detection)
+* Angular dashboard for visualization
+* ElasticSearch integration for indexing
 
 ---
 
 ## 👨‍💻 Summary
 
-This project demonstrates how to build a **scalable and high-performance file processing system** using .NET.
+This project demonstrates how to build a **scalable, high-performance, enterprise-grade file scanning system** using modern .NET practices.
 
 It focuses on:
 
-* Efficient file traversal
-* Parallel processing
+* Performance optimization
 * Clean architecture
-* Real-world system design concepts
+* Real-world system design
+* Cloud integration
