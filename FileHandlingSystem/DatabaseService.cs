@@ -77,5 +77,15 @@ namespace FileHandlingSystem
 
             return connection.ExecuteScalar<int>(sql, new { FilePath = filePath, Hash = hash }) > 0;
         }
+        public void InsertFilesBulk(List<FileRecord> files)
+        {
+            using var connection = CreateConnection();
+
+            var sql = @"INSERT INTO ScanFiles 
+                (JobId, FilePath, FileHash, LastModified, Status, ProcessedTime)
+                VALUES (@JobId, @FilePath, @Hash, @LastModified, 'Processed', GETDATE())";
+
+            connection.Execute(sql, files);
+        }
     }
 }

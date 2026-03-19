@@ -20,6 +20,7 @@ class Program
         Console.WriteLine("2. Producer-Consumer Scan");
         Console.WriteLine("3. Multi-threaded Scan (Parallel Workers)");
         Console.WriteLine("4. Incremental Scan (Hash-based)");
+        Console.WriteLine("5. Batch Optimized Scan (Bulk DB Insert)");
 
         var choice = Console.ReadLine();
 
@@ -39,6 +40,10 @@ class Program
 
             case "4":
                 RunIncrementalScan(connectionString);
+                break;
+
+            case "5":
+                RunBatchOptimizedScan(connectionString);
                 break;
 
             default:
@@ -161,7 +166,7 @@ class Program
 
         Console.WriteLine(" Multi-threaded scan completed");
     }
-
+    // Incremental scan that checks file hash to skip unchanged files
     static void RunIncrementalScan(string connectionString)
     {
         var scanner = new FileScannerService();
@@ -231,5 +236,97 @@ class Program
         db.CompleteScanJob(jobId, count);
 
         Console.WriteLine(" Incremental scan completed");
+    }
+    // Incremental scan that checks file hash to skip unchanged files
+    static void RunBatchOptimizedScan(string connectionString)
+    {
+        var scanner = new FileScannerService();
+        var db = new DatabaseService(connectionString);
+
+        Console.WriteLine("Enter path:");
+        var path = Console.ReadLine();
+
+        if (!Directory.Exists(path))
+        {
+            Console.WriteLine("Invalid path");
+            return;
+        }
+
+        int jobId = db.CreateScanJob("BatchOptimized");
+        int count = 0;
+
+        var fileQueue = new BlockingCollection<string>(1000);
+
+        // 🔹 Producer
+        var producer = Task.Run(() =>
+        {
+            foreach (var file in scanner.GetFiles(path))
+            {
+                Console.WriteLine($"[PRODUCER] {file}");
+                fileQueue.Add(file);
+            }
+
+            fileQueue.CompleteAdding();
+        });
+
+        int workerCount = Environment.ProcessorCount;
+
+        var consumers = Enumerable.Range(0, workerCount)
+            .Select(i => Task.Run(() =>
+            {
+                var batch = new List<FileRecord>();
+                int batchSize = 100;
+
+                foreach (var file in fileQueue.GetConsumingEnumerable())
+                {
+                    try
+                    {
+                        var hash = FileHelper.ComputeHash(file);
+                        var lastModified = File.GetLastWriteTimeUtc(file);
+
+                        if (db.IsFileUnchanged(file, hash))
+                        {
+                            Console.WriteLine($"[Worker {i}] SKIPPED: {file}");
+                            continue;
+                        }
+
+                        Console.WriteLine($"[Worker {i}] PROCESSING: {file}");
+
+                        batch.Add(new FileRecord
+                        {
+                            JobId = jobId,
+                            FilePath = file,
+                            Hash = hash,
+                            LastModified = lastModified
+                        });
+
+                        Interlocked.Increment(ref count);
+
+                        // 🔥 Batch insert
+                        if (batch.Count >= batchSize)
+                        {
+                            db.InsertFilesBulk(batch);
+                            batch.Clear();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error: {file} - {ex.Message}");
+                    }
+                }
+
+                // 🔥 Insert remaining
+                if (batch.Count > 0)
+                {
+                    db.InsertFilesBulk(batch);
+                }
+            }))
+            .ToArray();
+
+        Task.WaitAll(consumers);
+
+        db.CompleteScanJob(jobId, count);
+
+        Console.WriteLine("✅ Batch optimized scan completed");
     }
 }
