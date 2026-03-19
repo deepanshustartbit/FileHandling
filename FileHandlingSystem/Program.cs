@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 
 class Program
 {
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
         var builder = new ConfigurationBuilder()
         .SetBasePath(Directory.GetCurrentDirectory())
@@ -21,6 +21,7 @@ class Program
         Console.WriteLine("3. Multi-threaded Scan (Parallel Workers)");
         Console.WriteLine("4. Incremental Scan (Hash-based)");
         Console.WriteLine("5. Batch Optimized Scan (Bulk DB Insert)");
+        Console.WriteLine("6. Graph API Scan (SharePoint/OneDrive)");
 
         var choice = Console.ReadLine();
 
@@ -44,6 +45,10 @@ class Program
 
             case "5":
                 RunBatchOptimizedScan(connectionString);
+                break;
+
+            case "6":
+                await RunGraphScan(connectionString);
                 break;
 
             default:
@@ -257,7 +262,7 @@ class Program
 
         var fileQueue = new BlockingCollection<string>(1000);
 
-        // 🔹 Producer
+        // Producer
         var producer = Task.Run(() =>
         {
             foreach (var file in scanner.GetFiles(path))
@@ -315,7 +320,7 @@ class Program
                     }
                 }
 
-                // 🔥 Insert remaining
+                // Insert remaining
                 if (batch.Count > 0)
                 {
                     db.InsertFilesBulk(batch);
@@ -328,5 +333,33 @@ class Program
         db.CompleteScanJob(jobId, count);
 
         Console.WriteLine("✅ Batch optimized scan completed");
+    }
+    static async Task RunGraphScan(string connectionString)
+    {
+        string clientId = "d37c64b6-de86-4aa0-b22b-726eeb143760";
+
+        var graph = new GraphService(clientId);
+        var db = new DatabaseService(connectionString);
+
+        Console.WriteLine("Fetching files from Graph API...");
+
+        int jobId = db.CreateScanJob("GraphScan");
+        int count = 0;
+
+        var files = await graph.GetFilesAsync();
+
+        foreach (var file in files)
+        {
+            Console.WriteLine($"[GRAPH FILE] {file}");
+
+            //Insert into DB (using your old method)
+            db.InsertFile(jobId, file);
+
+            count++;
+        }
+
+        db.CompleteScanJob(jobId, count);
+
+        Console.WriteLine("✅ Graph scan completed");
     }
 }
