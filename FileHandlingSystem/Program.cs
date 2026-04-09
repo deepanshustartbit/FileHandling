@@ -171,6 +171,7 @@ class Program
 
         Console.WriteLine(" Multi-threaded scan completed");
     }
+
     // Incremental scan that checks file hash to skip unchanged files
     static void RunIncrementalScan(string connectionString)
     {
@@ -242,6 +243,7 @@ class Program
 
         Console.WriteLine(" Incremental scan completed");
     }
+
     // Incremental scan that checks file hash to skip unchanged files
     static void RunBatchOptimizedScan(string connectionString)
     {
@@ -334,12 +336,14 @@ class Program
 
         Console.WriteLine("✅ Batch optimized scan completed");
     }
+
     // Scan files from Graph API (SharePoint/OneDrive)
     static async Task RunGraphScan(string connectionString)
     {
-        string clientId = "d37c64b6-de86-4aa0-b22b-726eeb143760";
-
-        var graph = new GraphService(clientId);
+        string clientId = "------------";
+        string tenentid = "-------------------";
+        string clientSecret = "---------------------";
+    var graph = new GraphService(clientId, tenentid,clientSecret);
         var db = new DatabaseService(connectionString);
 
         Console.WriteLine("Fetching files from Graph API...");
