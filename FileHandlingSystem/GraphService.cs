@@ -13,12 +13,7 @@ namespace FileHandlingSystem
     
         public GraphService(string clientId,string tenentid, string clientSecret)
         {
-           /* var credential1 = new InteractiveBrowserCredential(
-                new InteractiveBrowserCredentialOptions
-                {
-                    ClientId = clientId,
-                    TenantId = "b9a7020e-8a77-44e1-a02b-16fbd5530d23"
-                });*/
+         
             var credential = new ClientSecretCredential(
                 tenentid,
                 clientId,
